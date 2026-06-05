@@ -1,0 +1,983 @@
+<div class="min-h-screen bg-[#050505] text-[#f5f5f4] flex flex-col font-sans select-none relative overflow-hidden">
+  
+  <!-- Subtle dynamic ambient glow in the background that changes colors depending on whether a track is playing -->
+  <div class="absolute inset-0 bg-radial from-brand-primary/10 via-transparent to-transparent pointer-events-none transition-all duration-1000 -z-10"
+       [ngStyle]="{'background': audioService.isPlaying() ? 'radial-gradient(circle at 50% 50%, rgba(129, 140, 248, 0.12) 0%, rgba(192, 132, 252, 0.08) 35%, transparent 70%)' : 'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 70%)'}">
+  </div>
+
+  <!-- Dynamic blurred back-light reflecting the active album cover art to generate an expensive music-studio vibe -->
+  @if (audioService.currentTrack(); as track) {
+    <div class="absolute top-[10%] left-[30%] w-[45vw] h-[45vw] rounded-full blur-[110px] pointer-events-none opacity-20 -z-20 transition-all duration-1000 animate-pulse"
+         [style.backgroundImage]="'url(' + track.coverUrl + ')'"
+         style="background-size: cover; background-position: center;">
+    </div>
+  }
+
+  <!-- Master Split Screen Layout Container -->
+  <div class="flex-grow flex w-full max-w-7xl mx-auto md:p-4 relative overflow-hidden" id="tempo-layout-wrapper">
+    
+    <!-- Sidebar Navigation: Fixed on Desktop, Hidden on Mobile -->
+    <aside id="sidebar-left" class="hidden md:flex flex-col w-64 p-6 glass-panel rounded-[32px] mr-4 border-white/10 relative z-10 shrink-0">
+      
+      <!-- Brand Logo / Identity Header - Styled with Playfair Serif Italic -->
+      <div class="flex flex-col space-y-1 mb-8 px-2" id="tempo-logo-container">
+        <h1 class="text-4xl font-display italic tracking-tight text-[#f5f5f4]">Tempo</h1>
+        <p class="text-[9px] tracking-[0.2em] text-white/40 uppercase">High-Performance Audio Engine</p>
+      </div>
+
+      <!-- Core Navigation Section -->
+      <nav class="flex-grow space-y-2" id="sidebar-nav">
+        <button id="nav-btn-home"
+                class="w-full text-left px-3 py-2.5 rounded-xl flex items-center space-x-3 transition-all duration-200"
+                [ngClass]="activeTab() === 'home' ? 'bg-white/5 text-[#f5f5f4] border-l-2 border-indigo-400 font-medium' : 'text-white/40 hover:text-white/80 hover:bg-white/5'"
+                (click)="selectTab('home')">
+          <mat-icon class="text-lg">home</mat-icon>
+          <span class="text-xs tracking-wide">Home Feed</span>
+        </button>
+
+        <button id="nav-btn-library"
+                class="w-full text-left px-3 py-2.5 rounded-xl flex items-center space-x-3 transition-all duration-200"
+                [ngClass]="activeTab() === 'library' ? 'bg-white/5 text-[#f5f5f4] border-l-2 border-indigo-400 font-medium' : 'text-white/40 hover:text-white/80 hover:bg-white/5'"
+                (click)="selectTab('library')">
+          <mat-icon class="text-lg">subscriptions</mat-icon>
+          <span class="text-xs tracking-wide">My Library</span>
+        </button>
+
+        <button id="nav-btn-queue"
+                class="w-full text-left px-3 py-2.5 rounded-xl flex items-center space-x-3 transition-all duration-200 relative"
+                [ngClass]="activeTab() === 'queue' ? 'bg-white/5 text-[#f5f5f4] border-l-2 border-indigo-400 font-medium' : 'text-white/40 hover:text-white/80 hover:bg-white/5'"
+                (click)="selectTab('queue')">
+          <mat-icon class="text-lg">playlist_play</mat-icon>
+          <span class="text-xs tracking-wide">Play Queue</span>
+          @if (audioService.queue().length > 0) {
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[9px] font-mono font-bold">
+              {{ audioService.queue().length }}
+            </span>
+          }
+        </button>
+      </nav>
+
+      <!-- Custom Playlists Navigation Divider -->
+      <div class="mt-6 border-t border-white/10 pt-4 flex-grow overflow-y-auto max-h-[30vh]" id="sidebar-playlists-section">
+        <div class="flex items-center justify-between px-2 mb-2">
+          <span class="text-[10px] uppercase font-mono tracking-widest text-white/40">Playlists</span>
+          <button class="text-white/40 hover:text-white transition-colors" (click)="librarySubTab.set('playlists'); selectTab('library')">
+            <mat-icon class="text-base">add</mat-icon>
+          </button>
+        </div>
+        <div class="space-y-1.5">
+          @for (playlist of audioService.playlists(); track playlist.id) {
+            <button class="w-full text-left px-3 py-1.5 text-xs rounded-lg flex items-center space-x-2 text-white/50 hover:text-white hover:bg-white/5 transition-all truncate"
+                    (click)="viewPlaylist(playlist.id)">
+              <mat-icon class="text-sm text-white/30 shrink-0">queue_music</mat-icon>
+              <span class="truncate">{{ playlist.name }}</span>
+            </button>
+          } @empty {
+            <p class="text-[10px] text-white/20 italic px-3 py-2">No lists found.</p>
+          }
+        </div>
+      </div>
+
+      <!-- Quick Interactive Hardware Control Deck -->
+      <div class="mt-auto border-t border-white/10 pt-4 space-y-3.5" id="sidebar-volume-rack">
+        <div class="flex items-center justify-between px-2 text-[10px]">
+          <span class="text-white/45 flex items-center space-x-1.5">
+            <mat-icon class="text-sm text-indigo-400/70">album</mat-icon>
+            <span class="tracking-wider">SYNTH: Engine</span>
+          </span>
+          <span class="text-indigo-400 font-mono text-[9px] flex items-center space-x-1 uppercase tracking-widest">
+            <span class="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></span>
+            <span>Active</span>
+          </span>
+        </div>
+        
+        <!-- Live Volume Slider -->
+        <div class="flex items-center px-1 space-x-2 text-white/60" id="sidebar-volume-slider">
+          <button (click)="audioService.setVolume(audioService.volume() === 0 ? 0.8 : 0)">
+            <mat-icon class="text-base text-white/50 hover:text-white transition-colors">
+              {{ audioService.volume() === 0 ? 'volume_off' : 'volume_up' }}
+            </mat-icon>
+          </button>
+          <div class="flex-grow h-1 bg-white/10 rounded-full relative cursor-pointer group"
+               #volContainer
+               (click)="onVolumeBarClick($event, volContainer)">
+            <div class="absolute inset-y-0 left-0 bg-white rounded-full group-hover:bg-white"
+                 [style.width.%]="audioService.volume() * 100"></div>
+          </div>
+          <span class="text-[10px] font-mono w-6 text-right shrink-0 text-white/40">
+            {{ Math.round(audioService.volume() * 100) }}%
+          </span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Active Screen Feed Container -->
+    <main id="main-feed-container" 
+          class="flex-grow flex flex-col glass-panel rounded-[32px] md:rounded-[40px] relative z-10 border-white/10 md:shadow-2xl overflow-y-auto overflow-x-hidden min-h-[85vh] md:min-h-0" 
+          (dragover)="onDragOver($event)" 
+          (drop)="onDrop($event)">
+      
+      <!-- Top Sticky Utility Header: Search Bar & File Import Launcher -->
+      <header id="main-header" class="sticky top-0 bg-[#050505]/70 backdrop-blur-xl border-b border-white/10 p-5 flex items-center justify-between z-20">
+        <div class="flex items-center space-x-2 flex-grow max-w-md">
+          <div class="relative w-full">
+            <mat-icon class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-lg">search</mat-icon>
+            <input type="text"
+                   placeholder="Search tracks, artists, genres..."
+                   class="w-full pl-10 pr-4 py-2 bg-white/5 hover:bg-white/10 focus:bg-[#050505] focus:outline-none focus:ring-1 focus:ring-white/20 text-xs rounded-xl text-[#f5f5f4] transition-all placeholder:text-white/20"
+                   [value]="searchQuery()"
+                   (input)="searchQuery.set($any($event.target).value)" />
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-4 ml-4 shrink-0">
+          <!-- Audio File Scanner Trigger button -->
+          <button class="bg-white/5 hover:bg-white/15 text-[#f5f5f4] border border-white/10 text-xs font-semibold px-4 py-2 rounded-xl flex items-center space-x-2 transition-all cursor-pointer"
+                  (click)="triggerFileSelect()">
+            <mat-icon class="text-base text-white/60">cloud_upload</mat-icon>
+            <span class="hidden sm:inline">Import Audio</span>
+          </button>
+          
+          <!-- Secret Hidden Input -->
+          <input type="file" 
+                 #fileInputEl 
+                 multiple 
+                 accept="audio/*" 
+                 (change)="handleFileUpload($event)" 
+                 class="hidden" />
+
+          <!-- Dynamic Sound active indicator representing music playing visually -->
+          @if (audioService.isPlaying()) {
+            <div class="flex items-end justify-center space-x-[2px] h-4 w-6" title="Playback Active">
+              <span class="w-[3px] bg-indigo-400 rounded-sm music-bar-1 h-3.5"></span>
+              <span class="w-[3px] bg-purple-400 rounded-sm music-bar-2 h-4"></span>
+              <span class="w-[3px] bg-indigo-400 rounded-sm music-bar-3 h-2"></span>
+              <span class="w-[3px] bg-purple-400 rounded-sm music-bar-4 h-3"></span>
+            </div>
+          }
+        </div>
+      </header>
+
+      <!-- Active Content view switcher based on activeTab signal -->
+      <div id="active-tab-panel" class="flex-grow p-5 md:p-8">
+        
+        <!-- ================= HOME TAB VIEW ================= -->
+        @if (activeTab() === 'home') {
+          <section id="tab-home" class="space-y-8">
+            
+            <!-- Quick Hero Carousel Slide -->
+            <div class="relative rounded-[32px] overflow-hidden bg-gradient-to-b from-[#111111] to-[#0A0A0A] border border-white/10 p-6 md:p-8 shrink-0 shadow-xl flex flex-col justify-between h-48 md:h-56">
+              <div class="max-w-lg">
+                <span class="text-[9px] font-mono py-1 px-2.5 bg-white/5 text-white/50 border border-white/10 rounded-full font-bold uppercase tracking-widest">Featured Track Generator</span>
+                <h1 class="font-display italic text-2xl md:text-3xl text-[#f5f5f4] mt-3 leading-tight tracking-tight">
+                  Experience Procedural Synths in Real-Time Web Audio
+                </h1>
+                <p class="text-[11px] text-white/40 mt-2 line-clamp-2">
+                  No static mp3 streams needed. "Tempo" procedural engine synthesizes retro drums, warm lofi chords, and celestial arpeggios directly inside your browser sandbox.
+                </p>
+              </div>
+              <div class="flex space-x-3 mt-4">
+                <button class="bg-white hover:bg-[#e5e5e0] text-black text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center space-x-2 transition-all cursor-pointer"
+                        (click)="audioService.playTrack(audioService.library()[0])">
+                  <mat-icon class="text-sm">play_arrow</mat-icon>
+                  <span>Play "Suborbital Drift"</span>
+                </button>
+                <button class="bg-white/5 hover:bg-white/10 text-[#f5f5f4] text-xs font-medium px-4 py-2.5 rounded-xl border border-white/10 flex items-center space-x-2 transition-all cursor-pointer"
+                        (click)="selectTab('library'); librarySubTab.set('playlists')">
+                  <mat-icon class="text-sm text-white/40">queue_music</mat-icon>
+                  <span>Explore Mixes</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Preloaded Soundscapes (Grid Cards Layout) -->
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="font-display italic text-lg text-[#f5f5f4] tracking-wide">Live Procedural Synths</h2>
+                <span class="text-[9px] font-mono uppercase tracking-wider text-white/40 bg-white/5 px-2 py-0.5 rounded border border-white/10">4 Algorithms</span>
+              </div>
+              
+              <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="synth-tracks-grid">
+                @for (track of audioService.library().slice(0, 4); track track.id) {
+                  <div class="group relative bg-[#0C0C0C]/60 hover:bg-[#0C0C0C] border border-white/5 hover:border-white/15 p-3.5 rounded-[24px] transition-all duration-300 cursor-pointer"
+                       (click)="audioService.playTrack(track)">
+                    <div class="relative aspect-square rounded-[18px] overflow-hidden bg-slate-900 mb-3.5 shadow-md">
+                      <img [src]="track.coverUrl" [alt]="track.title" referrerpolicy="no-referrer" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" />
+                      
+                      <!-- Overlay play button -->
+                      <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                        <button class="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                          <mat-icon class="text-lg">play_arrow</mat-icon>
+                        </button>
+                      </div>
+
+                      @if (audioService.currentTrack()?.id === track.id) {
+                        <div class="absolute top-2 right-2 bg-white/95 text-black text-[9px] font-bold uppercase px-2 py-0.5 rounded shadow flex items-center gap-1">
+                          <span class="w-1.5 h-1.5 bg-black rounded-full animate-ping"></span>
+                          <span>Playing</span>
+                        </div>
+                      }
+                    </div>
+                    <h3 class="font-medium text-xs text-white/90 truncate group-hover:text-white transition-all">{{ track.title }}</h3>
+                    <p class="text-[10px] text-white/40 truncate mt-1">{{ track.artist }}</p>
+                    <div class="flex items-center justify-between mt-2.5">
+                      <span class="text-[9px] font-mono px-1.5 py-0.5 bg-white/5 text-white/50 rounded-md border border-white/5">{{ track.genre }}</span>
+                      <span class="text-[9px] text-white/30 font-mono">{{ formatTime(track.duration) }}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Drag & Drop Storage File Sync Scanner Panel -->
+            <div id="drag-drop-zone"
+                 class="border border-dashed border-white/10 hover:border-white/20 rounded-[28px] p-6 bg-[#0A0A0A] hover:bg-[#0F0F0F] text-center transition-all cursor-pointer flex flex-col items-center justify-center space-y-3 relative"
+                 (click)="triggerFileSelect()">
+              
+              <div class="w-11 h-11 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shadow text-indigo-400">
+                <mat-icon class="text-xl">phonelink_setup</mat-icon>
+              </div>
+              <div>
+                <h3 class="font-medium text-xs text-[#f5f5f4]">Local Device Media Scanner</h3>
+                <p class="text-[10px] text-white/40 mt-1 max-w-sm mx-auto">
+                  Drag and drop local music files (<span class="font-mono text-white/60">MP3, WAV, FLAC</span>) directly to dynamically scan, cache, and queue items securely inside the player.
+                </p>
+              </div>
+              <span class="text-[9px] bg-white/5 text-white/60 border border-white/10 px-2.5 py-0.5 rounded-full font-mono uppercase tracking-widest">
+                Local Cache Engine
+              </span>
+            </div>
+
+            <!-- Featured Curated Mix playlists row -->
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="font-display italic text-lg text-[#f5f5f4] tracking-wide">Daily Mind Mixes</h2>
+                <button class="text-xs text-white/40 hover:text-white" (click)="selectTab('library'); librarySubTab.set('playlists')">See All</button>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                @for (pl of audioService.playlists(); track pl.id) {
+                  <div class="flex items-center justify-between p-4 bg-[#0A0A0A]/80 hover:bg-[#0A0A0A] text-indigo-100 rounded-2xl border border-white/5 hover:border-white/10 cursor-pointer group transition-all"
+                       (click)="viewPlaylist(pl.id)">
+                    <div class="flex items-center space-x-4 min-w-0">
+                      <div class="w-11 h-11 rounded-xl bg-white/5 flex items-center justify-center text-white/60 shrink-0 border border-white/15 relative overflow-hidden">
+                        <mat-icon class="text-lg group-hover:scale-110 transition-transform">queue_music</mat-icon>
+                      </div>
+                      <div class="min-w-0">
+                        <h4 class="text-xs font-semibold text-white/90 group-hover:text-white transition-all truncate">{{ pl.name }}</h4>
+                        <p class="text-[10px] text-white/30 mt-1 font-mono">
+                          {{ pl.trackIds.length }} Items • Curated Soundscape
+                        </p>
+                      </div>
+                    </div>
+                    <button class="w-8 h-8 rounded-full bg-white/5 group-hover:bg-white text-white/60 group-hover:text-black flex items-center justify-center transition-all cursor-pointer shadow border border-white/10"
+                            (click)="playPlaylist(pl); $event.stopPropagation()">
+                      <mat-icon class="text-sm">play_arrow</mat-icon>
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+
+          </section>
+        }
+
+        <!-- ================= LIBRARY TAB VIEW ================= -->
+        @if (activeTab() === 'library') {
+          <section id="tab-library" class="space-y-6">
+            
+            <div class="flex items-center justify-between shrink-0 mb-2">
+              <h1 class="font-display italic text-xl tracking-tight text-white flex items-center gap-2">
+                <mat-icon class="text-indigo-400">subscriptions</mat-icon>
+                <span>My Music Library</span>
+              </h1>
+            </div>
+
+            <!-- Custom Horizontal SubTabs Split (Songs, Artists, Albums, Playlists) -->
+            <div class="flex border-b border-white/10 scroll-x-hidden" id="library-tabs-rail">
+              <button class="px-4 py-2.5 text-xs text-white/40 border-b-2 font-medium transition-all cursor-pointer"
+                      [ngClass]="librarySubTab() === 'songs' ? 'border-white text-white font-semibold' : 'border-transparent hover:text-white'"
+                      (click)="selectLibrarySubTab('songs')">
+                All Tracks
+              </button>
+              <button class="px-4 py-2.5 text-xs text-white/40 border-b-2 font-medium transition-all cursor-pointer"
+                      [ngClass]="librarySubTab() === 'artists' ? 'border-white text-white font-semibold' : 'border-transparent hover:text-white'"
+                      (click)="selectLibrarySubTab('artists')">
+                Artists
+              </button>
+              <button class="px-4 py-2.5 text-xs text-white/40 border-b-2 font-medium transition-all cursor-pointer"
+                      [ngClass]="librarySubTab() === 'albums' ? 'border-white text-white font-semibold' : 'border-transparent hover:text-white'"
+                      (click)="selectLibrarySubTab('albums')">
+                Albums
+              </button>
+              <button class="px-4 py-2.5 text-xs text-white/40 border-b-2 font-medium transition-all cursor-pointer"
+                      [ngClass]="librarySubTab() === 'playlists' ? 'border-white text-white font-semibold' : 'border-transparent hover:text-white'"
+                      (click)="selectLibrarySubTab('playlists')">
+                Playlists
+              </button>
+            </div>
+
+            <!-- LIBRARY SUB-VIEW: SONGS LIST -->
+            @if (librarySubTab() === 'songs') {
+              <div class="space-y-3">
+                <div class="text-[10px] font-mono text-white/30 flex justify-between px-3 pb-1.5 border-b border-white/10">
+                  <span class="w-[45%]">TITLE</span>
+                  <span class="w-[25%] hidden sm:inline">ALBUM</span>
+                  <span class="w-[15%] text-center">DURATION</span>
+                  <span class="w-[15%] text-right">CONTROLS</span>
+                </div>
+
+                <div class="space-y-1.5">
+                  @for (track of filteredSongs(); track track.id) {
+                    <div class="flex items-center justify-between p-3.5 rounded-2xl bg-white/2 hover:bg-white/5 border border-white/5 transition-all cursor-pointer group"
+                         [ngClass]="{'bg-white/5 border-white/25': audioService.currentTrack()?.id === track.id}"
+                         (click)="audioService.playTrack(track)">
+                      
+                      <!-- Title & Artwork -->
+                      <div class="w-[45%] flex items-center space-x-3.5 min-w-0">
+                        <div class="w-10 h-10 rounded-[10px] bg-slate-900 shrink-0 relative overflow-hidden shadow border border-white/5">
+                          <img [src]="track.coverUrl" [alt]="track.title" referrerpolicy="no-referrer" class="w-full h-full object-cover" />
+                          <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                            <mat-icon class="text-sm text-white leading-none">
+                              {{ audioService.currentTrack()?.id === track.id && audioService.isPlaying() ? 'pause' : 'play_arrow' }}
+                            </mat-icon>
+                          </div>
+                        </div>
+                        <div class="min-w-0">
+                          <h4 class="text-xs font-semibold text-white/90 group-hover:text-white truncate">{{ track.title }}</h4>
+                          <p class="text-[10px] text-white/40 truncate mt-0.5">{{ track.artist }}</p>
+                        </div>
+                      </div>
+
+                      <!-- Album Name -->
+                      <span class="w-[25%] text-xs text-white/40 truncate hidden sm:inline">
+                        {{ track.album }}
+                      </span>
+
+                      <!-- Duration -->
+                      <span class="w-[15%] text-center font-mono text-[11px] text-white/40">
+                        {{ formatTime(track.duration) }}
+                      </span>
+
+                      <!-- Right Hand Interactive Controls (Favorites & Menu Selector) -->
+                      <div class="w-[15%] text-right flex items-center justify-end space-x-1.5 relative">
+                        <button class="p-1 px-2.5 rounded-lg text-white/45 hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer font-sans"
+                                [ngStyle]="{'color': track.isFavorite ? '#ef4444' : ''}"
+                                (click)="toggleFavorite(track, $event); $event.stopPropagation()">
+                          <mat-icon class="text-base">{{ track.isFavorite ? 'favorite' : 'favorite_border' }}</mat-icon>
+                        </button>
+                        
+                        <!-- Playlist Adder Trigger popover button -->
+                        <button class="p-1 px-1.5 rounded-lg text-white/45 hover:text-white hover:bg-white/5 transition-all cursor-pointer relative"
+                                (click)="toggleTrackMenu(track.id, $event); $event.stopPropagation()">
+                          <mat-icon class="text-base">add</mat-icon>
+
+                          <!-- Dynamic Absolute Popover Menu for adding to playlists -->
+                          @if (trackMenuOpenId() === track.id) {
+                            <div class="absolute right-0 top-8 w-44 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl p-2 text-left z-30 font-sans glass-panel"
+                                 (click)="$event.stopPropagation()">
+                              <span class="block px-2.5 py-1 text-[9px] font-mono tracking-widest text-white/30 uppercase select-none border-b border-white/5 mb-1.5">
+                                Add To Playlist
+                              </span>
+                              @for (pl of audioService.playlists(); track pl.id) {
+                                <button class="w-full text-left px-2.5 py-1.5 text-[11px] rounded-lg hover:bg-white/5 text-white/60 hover:text-white flex items-center space-x-2 transition-all cursor-pointer truncate"
+                                        (click)="addTrackToPlaylist(pl.id, track.id, $event)">
+                                  <mat-icon class="text-sm text-white/30 truncate shrink-0">queue_music</mat-icon>
+                                  <span class="truncate">{{ pl.name }}</span>
+                                </button>
+                              } @empty {
+                                <span class="block px-2.5 py-2 text-[10px] text-zinc-600 italic">No custom playlists.</span>
+                              }
+                            </div>
+                          }
+                        </button>
+                      </div>
+
+                    </div>
+                  } @empty {
+                    <div class="text-center py-12 text-white/30">
+                      <mat-icon class="text-4xl text-white/10">music_note</mat-icon>
+                      <p class="text-xs font-semibold mt-2">No matching songs in library</p>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- LIBRARY SUB-VIEW: ARTISTS GRID -->
+            @if (librarySubTab() === 'artists') {
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                @for (artist of artists(); track artist.name) {
+                  <div class="bg-[#0A0A0A]/80 p-4 rounded-3xl border border-white/5 hover:border-white/15 cursor-pointer text-center group transition-all"
+                       (click)="playArtistTracks(artist.name)">
+                    <div class="w-20 h-20 rounded-full mx-auto bg-slate-900 overflow-hidden mb-3 relative group-hover:scale-105 transition-transform duration-300 border border-white/5">
+                      <img [src]="artist.cover" [alt]="artist.name" referrerpolicy="no-referrer" class="w-full h-full object-cover" />
+                      <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                        <mat-icon class="text-white">play_arrow</mat-icon>
+                      </div>
+                    </div>
+                    <h4 class="text-xs font-semibold text-white/90 group-hover:text-white truncate transition-all">{{ artist.name }}</h4>
+                    <span class="text-[10px] text-white/40 font-mono mt-1 block">{{ artist.count }} Tracks loaded</span>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- LIBRARY SUB-VIEW: ALBUMS GRID -->
+            @if (librarySubTab() === 'albums') {
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-4" id="albums-grid">
+                @for (album of albums(); track album.title) {
+                  <div class="bg-[#0A0A0A]/80 p-3.5 rounded-[24px] border border-white/5 hover:border-white/15 cursor-pointer group transition-all"
+                       (click)="playAlbumTracks(album.title)">
+                    <div class="aspect-square rounded-[18px] bg-slate-900 overflow-hidden mb-3.5 relative shrink-0 shadow border border-white/5">
+                      <img [src]="album.cover" [alt]="album.title" referrerpolicy="no-referrer" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                        <mat-icon class="text-white">play_arrow</mat-icon>
+                      </div>
+                    </div>
+                    <h4 class="text-xs font-semibold text-white/90 group-hover:text-white truncate transition-all">{{ album.title }}</h4>
+                    <p class="text-[10px] text-white/40 mt-1 truncate">{{ album.artist }}</p>
+                    <span class="text-[9px] font-mono mt-1 text-white/30 float-right">{{ album.count }} Tracks</span>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- LIBRARY SUB-VIEW: PLAYLISTS CRUD BUILDER -->
+            @if (librarySubTab() === 'playlists') {
+              <div class="space-y-6">
+                <!-- Creator Form block -->
+                <div class="p-5 bg-[#0a0a0a] rounded-[24px] border border-white/10 space-y-3.5 max-w-md shrink-0">
+                  <h3 class="text-xs font-semibold text-[#f5f5f4] uppercase tracking-wider">Create New Custom Mix</h3>
+                  <div class="flex space-x-2.5">
+                    <input type="text"
+                           placeholder="Type playlist name..."
+                           class="flex-grow px-3 py-2 bg-white/5 focus:outline-none focus:ring-1 focus:ring-white/25 text-xs rounded-xl border border-white/10 text-[#f5f5f4]"
+                           [value]="playlistNameInput()"
+                           (input)="playlistNameInput.set($any($event.target).value)"
+                           (keyup.enter)="onCreatePlaylist()" />
+                    <button class="bg-white hover:bg-[#e5e5e0] text-black text-xs font-bold px-4 py-2 rounded-xl shadow-lg active:scale-95 transition-all cursor-pointer shrink-0"
+                            (click)="onCreatePlaylist()">
+                      Create
+                    </button>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  @for (pl of audioService.playlists(); track pl.id) {
+                    <div class="flex items-center justify-between p-4 bg-[#0A0A0A]/80 hover:bg-[#0A0A0A] border border-white/5 hover:border-white/10 rounded-2xl cursor-pointer group transition-all"
+                         (click)="viewPlaylist(pl.id)">
+                      <div class="flex items-center space-x-3.5 min-w-0">
+                        <div class="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/60 shrink-0">
+                          <mat-icon>queue_music</mat-icon>
+                        </div>
+                        <div class="min-w-0">
+                          <h4 class="text-xs font-semibold text-white/95 truncate break-all group-hover:text-white transition-all pr-2">{{ pl.name }}</h4>
+                          <span class="text-[10px] text-white/40 mt-1 block font-mono">
+                            {{ pl.trackIds.length }} songs • Created Custom Mix
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div class="flex items-center space-x-2">
+                        <!-- Play entire playlist directly -->
+                        <button class="w-8 h-8 rounded-full bg-white/5 hover:bg-white text-white/60 hover:text-black flex items-center justify-center shadow border border-white/10 transition-all cursor-pointer"
+                                (click)="playPlaylist(pl); $event.stopPropagation()">
+                          <mat-icon class="text-sm">play_arrow</mat-icon>
+                        </button>
+                        
+                        <!-- Delete Playlist -->
+                        <button class="w-8 h-8 rounded-full bg-white/5 hover:bg-rose-500/20 text-white/30 hover:text-rose-450 border border-white/10 flex items-center justify-center transition-all cursor-pointer"
+                                (click)="onDeletePlaylist(pl.id, $event)"
+                                title="Delete Playlist">
+                          <mat-icon class="text-sm">delete</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+          </section>
+        }
+
+        <!-- ================= PLAY QUEUE TAB VIEW ================= -->
+        @if (activeTab() === 'queue') {
+          <section id="tab-queue" class="space-y-6">
+            <div class="flex items-center justify-between shrink-0 mb-4 border-b border-white/10 pb-3">
+              <h1 class="font-display italic text-xl tracking-tight text-white flex items-center gap-2">
+                <mat-icon class="text-indigo-400">playlist_play</mat-icon>
+                <span>Live Playing Queue</span>
+              </h1>
+              @if (audioService.queue().length > 0) {
+                <button class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 text-[10px] uppercase font-mono tracking-widest px-3 py-1.5 rounded-lg border border-rose-500/20 transition-all cursor-pointer"
+                        (click)="audioService.clearQueue()">
+                  Clear Queue
+                </button>
+              }
+            </div>
+
+            <!-- Queue interactive table list -->
+            <div class="space-y-1.5">
+              @for (track of audioService.queue(); track track.id; let i = $index) {
+                <div class="flex items-center justify-between p-3.5 rounded-2xl bg-white/2 hover:bg-white/5 border border-white/5 transition-all cursor-pointer group"
+                     [ngClass]="{'bg-white/5 border-white/25': audioService.currentTrackIndex() === i}"
+                     (click)="audioService.playTrack(track)">
+                  
+                  <div class="flex items-center space-x-3.5 min-w-0">
+                    <!-- Queue Index number -->
+                    <div class="w-6 text-center text-xs shrink-0 font-mono text-white/30">
+                      @if (audioService.currentTrackIndex() === i && audioService.isPlaying()) {
+                        <span class="text-white font-bold">&#9658;</span>
+                      } @else {
+                        <span>{{ i + 1 }}</span>
+                      }
+                    </div>
+
+                    <div class="w-10 h-10 rounded-[10px] overflow-hidden bg-slate-900 shrink-0 shadow border border-white/5">
+                      <img [src]="track.coverUrl" [alt]="track.title" referrerpolicy="no-referrer" class="w-full h-full object-cover" />
+                    </div>
+
+                    <div class="min-w-0">
+                      <h4 class="text-xs font-semibold text-white/90 group-hover:text-white transition-all truncate pr-2">{{ track.title }}</h4>
+                      <p class="text-[10px] text-white/40 truncate mt-0.5">{{ track.artist }}</p>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center space-x-3">
+                    <span class="font-mono text-[11px] text-white/40 font-light">{{ formatTime(track.duration) }}</span>
+                    
+                    <!-- Remove individual cue track -->
+                    <button class="w-7 h-7 rounded-lg text-white/30 hover:text-rose-500 hover:bg-rose-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                            (click)="audioService.removeFromQueue(track.id); $event.stopPropagation()">
+                      <mat-icon class="text-base">close</mat-icon>
+                    </button>
+                  </div>
+
+                </div>
+              } @empty {
+                <div class="text-center py-16 text-white/30 col-span-full">
+                  <mat-icon class="text-5xl text-white/10">playlist_add</mat-icon>
+                  <p class="text-xs font-semibold mt-3">The playing queue is empty</p>
+                  <p class="text-[11px] text-white/40 mt-1 max-w-xs mx-auto">Click on tracks or playlists to load audio segments.</p>
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- ================= INDIVIDUAL PLAYLIST VIEWER TAB ================= -->
+        @if (activeTab() === 'playlist') {
+          <section id="tab-playlist" class="space-y-6">
+            
+            @if (activePlaylist(); as pl) {
+              <!-- Detailed Playlist Header Cards -->
+              <div class="flex flex-col sm:flex-row items-center sm:items-end gap-5 border-b border-white/10 pb-6">
+                <!-- Large Playlist Graphic Frame -->
+                <div class="w-28 h-28 sm:w-36 sm:h-36 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center text-white/50 shrink-0 relative overflow-hidden shadow">
+                  <mat-icon class="text-5xl md:text-6xl text-white/40">queue_music</mat-icon>
+                  <div class="absolute inset-x-0 bottom-0 py-1 bg-black/60 text-center text-[9px] font-mono tracking-widest text-[#f5f5f4]/60">
+                    CURATED SOUND
+                  </div>
+                </div>
+
+                <div class="flex-grow text-center sm:text-left">
+                  <span class="text-[10px] font-mono uppercase tracking-widest text-indigo-400">Custom Play Mix</span>
+                  <h1 class="font-display italic text-2xl md:text-3xl text-white mt-1.5 break-all max-w-md">{{ pl.name }}</h1>
+                  <p class="text-[11px] text-white/40 mt-2 font-mono">
+                    {{ activePlaylistTracks().length }} Tracks • Established {{ pl.createdAt | date:'mediumDate' }}
+                  </p>
+                  
+                  <div class="flex items-center justify-center sm:justify-start space-x-3 mt-4">
+                    <button class="bg-white hover:bg-[#e5e5e0] text-black font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg flex items-center space-x-2 active:scale-95 transition-all cursor-pointer"
+                            [disabled]="activePlaylistTracks().length === 0"
+                            (click)="playPlaylist(pl)">
+                      <mat-icon class="text-sm">play_arrow</mat-icon>
+                      <span>Play Track Mix</span>
+                    </button>
+
+                    <button class="p-2 py-2.5 rounded-xl border border-white/10 text-white/45 hover:text-white hover:bg-white/5 text-xs font-semibold flex items-center space-x-1 cursor-pointer"
+                            (click)="onDeletePlaylist(pl.id, $event)">
+                      <mat-icon class="text-xs">delete</mat-icon>
+                      <span>Delete Mix</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Playlist Songs List -->
+              <div class="space-y-1.5">
+                @for (track of activePlaylistTracks(); track track.id; let idx = $index) {
+                  <div class="flex items-center justify-between p-3.5 rounded-2xl bg-white/2 hover:bg-white/5 border border-white/5 transition-all cursor-pointer group"
+                       [ngClass]="{'bg-white/5 border-white/25': audioService.currentTrack()?.id === track.id}"
+                       (click)="audioService.playTrack(track)">
+                    
+                    <div class="flex items-center space-x-3.5 min-w-0">
+                      <span class="w-6 text-center text-xs font-mono text-white/30 shrink-0">{{ idx + 1 }}</span>
+                      
+                      <div class="w-10 h-10 rounded-[10px] overflow-hidden bg-slate-900 shrink-0 shadow border border-white/5">
+                        <img [src]="track.coverUrl" [alt]="track.title" referrerpolicy="no-referrer" class="w-full h-full object-cover" />
+                      </div>
+
+                      <div class="min-w-0">
+                        <h4 class="text-xs font-semibold text-white/95 group-hover:text-white truncate pr-2">{{ track.title }}</h4>
+                        <p class="text-[10px] text-white/40 truncate mt-0.5">{{ track.artist }}</p>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center space-x-3 text-white/40">
+                      <span class="font-mono text-[11px]">{{ formatTime(track.duration) }}</span>
+                      
+                      <!-- Remove track from this specific playlist -->
+                      <button class="w-7 h-7 rounded-lg text-white/30 hover:text-rose-500 hover:bg-rose-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                              (click)="removeTrackFromPlaylist(track.id, $event); $event.stopPropagation()">
+                        <mat-icon class="text-base">close</mat-icon>
+                      </button>
+                    </div>
+
+                  </div>
+                } @empty {
+                  <div class="text-center py-16 text-white/30">
+                    <mat-icon class="text-5xl text-white/10">music_note</mat-icon>
+                    <p class="text-xs font-semibold mt-3">There are no tracks in this playlist</p>
+                    <button class="mt-3.5 bg-white/5 hover:bg-white/10 text-[#f5f5f4] border border-white/10 text-xs font-semibold px-4 py-2 rounded-xl transition-all cursor-pointer"
+                            (click)="selectTab('library'); librarySubTab.set('songs')">
+                      Browse Songs Catalog
+                    </button>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="text-center py-16 text-white/20">
+                <mat-icon class="text-4xl text-white/10">folder_off</mat-icon>
+                <p class="text-xs font-semibold mt-2">No playlist chosen</p>
+              </div>
+            }
+
+          </section>
+        }
+
+      </div>
+      
+      <div class="h-20 shrink-0"></div> <!-- Floating miniplayer spacer block -->
+    </main>
+
+    <!-- RIGHT HAND COMPACT NOW PLAYING DECK (Fixed panel on Desktop screen layout) -->
+    <aside id="sidebar-now-playing-panel" class="hidden xl:flex flex-col w-80 p-6 glass-panel rounded-[32px] ml-4 border-white/10 relative z-10 shrink-0 justify-between items-center text-center">
+      
+      @if (audioService.currentTrack(); as track) {
+        
+        <!-- Artwork area -->
+        <div class="w-full max-w-sm mt-3 relative">
+          <!-- Ambient glowing layer -->
+          <div class="absolute inset-0 rounded-3xl bg-radial from-indigo-500/10 to-transparent blur-3xl pointer-events-none -z-10 animate-pulse"></div>
+          
+          <div class="aspect-square rounded-[32px] overflow-hidden shadow-2xl relative group bg-zinc-950 border border-white/10"
+               [ngClass]="audioService.isPlaying() ? 'animate-[spin_24s_linear_infinite]' : ''" id="desktop-spinning-vinyl">
+            <img [src]="track.coverUrl" [alt]="track.title" referrerpolicy="no-referrer" class="w-full h-full object-cover" />
+            <!-- Centered real physical record pin design -->
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="w-12 h-12 bg-[#050505]/90 rounded-full border border-white/15 flex items-center justify-center">
+                <div class="w-4 h-4 bg-[#f5f5f4] rounded-full shadow"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Song details -->
+        <div class="w-full mt-6">
+          <h2 class="font-display italic text-lg text-white tracking-wide truncate pr-1" id="desktop-current-title">{{ track.title }}</h2>
+          <p class="text-white/40 text-[11px] mt-1.5 truncate">{{ track.artist }} • {{ track.album }}</p>
+          <span class="inline-block mt-3 bg-white/5 text-white/50 border border-white/10 text-[9px] font-mono font-medium tracking-widest px-2.5 py-0.5 rounded-full uppercase">
+            {{ track.synthType ? 'Live Synthesizer' : 'Physical File' }}
+          </span>
+        </div>
+
+        <!-- Controls slider deck -->
+        <div class="w-full space-y-4">
+          
+          <!-- Master ProgressBar tracking time in tracks -->
+          <div class="space-y-1.5">
+            <div class="flex-grow h-1 bg-white/10 rounded-full relative cursor-pointer"
+                 #deskProgress
+                 (click)="onProgressBarClick($event, deskProgress)">
+              <div class="absolute inset-y-0 left-0 bg-white rounded-full"
+                   [style.width.%]="(audioService.currentTime() / audioService.duration()) * 100"></div>
+            </div>
+            
+            <div class="flex justify-between items-center text-[10px] font-mono text-white/30">
+              <span>{{ formatTime(audioService.currentTime()) }}</span>
+              <span>{{ formatTime(audioService.duration()) }}</span>
+            </div>
+          </div>
+
+          <!-- Buttons container -->
+          <div class="flex items-center justify-center space-x-5" id="desktop-media-buttons">
+            <!-- Shuffle toggle button -->
+            <button class="p-1 px-1.5 rounded-lg transition-all cursor-pointer text-white/40 hover:text-white"
+                    [ngClass]="{'!text-white bg-white/10 border border-white/10': audioService.shuffleMode()}"
+                    (click)="audioService.toggleShuffle()">
+              <mat-icon class="text-lg">shuffle</mat-icon>
+            </button>
+
+            <!-- Back -->
+            <button class="p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-all text-xl cursor-pointer" 
+                    (click)="audioService.previous()">
+              <mat-icon class="text-3xl leading-none">skip_previous</mat-icon>
+            </button>
+
+            <!-- Huge Core Play Toggle button -->
+            <button class="w-12 h-12 rounded-full bg-[#f5f5f4] hover:bg-[#e5e5e0] text-black flex items-center justify-center shadow-lg cursor-pointer transform active:scale-95 transition-all"
+                    (click)="audioService.togglePlay()">
+              <mat-icon class="text-2xl leading-none">
+                {{ audioService.isPlaying() ? 'pause' : 'play_arrow' }}
+              </mat-icon>
+            </button>
+
+            <!-- Next -->
+            <button class="p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-all text-xl cursor-pointer" 
+                    (click)="audioService.next()">
+              <mat-icon class="text-3xl leading-none">skip_next</mat-icon>
+            </button>
+
+            <!-- Repeat Mode cycle button -->
+            <button class="p-1 px-1.5 rounded-lg transition-all cursor-pointer text-white/45 hover:text-white"
+                    [ngClass]="audioService.repeatMode() !== 'none' ? 'text-white bg-white/10 border border-white/10' : 'text-white/40 hover:text-white'"
+                    (click)="audioService.cycleRepeat()">
+              <mat-icon class="text-lg">
+                {{ audioService.repeatMode() === 'one' ? 'repeat_one' : 'repeat' }}
+              </mat-icon>
+            </button>
+          </div>
+
+        </div>
+
+      } @else {
+        <!-- Zero Play deck default -->
+        <div class="text-center py-20 text-white/30 flex flex-col justify-center items-center my-auto">
+          <div class="w-12 h-12 bg-white/5 border border-white/10 rounded-full flex items-center justify-center text-white/20 animate-pulse mb-3">
+            <mat-icon class="text-2xl">album</mat-icon>
+          </div>
+          <p class="text-xs font-semibold text-white/50 uppercase tracking-widest text-[9px] font-mono">Tempo Ambient Deck</p>
+          <p class="text-[10px] text-white/30 mt-1 max-w-[150px]">Choose a tracking sequence to boot system.</p>
+        </div>
+      }
+
+    </aside>
+
+  </div>
+
+  <!-- FLOATING PERSISTENT MINI PLAYER (Bottom stick glass tray responsive layout, always visible on mobile/all screens) -->
+  @if (audioService.currentTrack(); as track) {
+    <!-- Floating mini-player wrapper -->
+    <div id="tempo-miniplayer"
+         class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg mb-0 md:mb-4 p-1 shrink-0 z-40"
+         (click)="showNowPlayingFull.set(true); $event.stopPropagation()">
+      
+      <!-- Rounded glass layout container with sliding tap click to open immersive panel -->
+      <div class="glass-panel text-slate-100 rounded-none md:rounded-3xl p-2.5 flex items-center justify-between border-t md:border border-white/10 shadow-2xl relative overflow-hidden cursor-pointer hover:bg-[#0A0A0A] duration-200" id="miniplayer-deck">
+        
+        <!-- Visual slider track bar aligned seamlessly along top boundary -->
+        <div class="absolute top-0 left-0 right-0 h-[2px] bg-white/10">
+          <div class="h-full bg-white animate-pulse" [style.width.%]="(audioService.currentTime() / audioService.duration()) * 100"></div>
+        </div>
+
+        <div class="flex items-center space-x-3.5 min-w-0 pr-2">
+          <!-- Thumbnail cover -->
+          <div class="w-10 h-10 rounded-[10px] overflow-hidden bg-slate-900 shrink-0 border border-white/5 shadow relative">
+            <img [src]="track.coverUrl" [alt]="track.title" referrerpolicy="no-referrer" class="w-full h-full object-cover" />
+          </div>
+          
+          <div class="min-w-0">
+            <h3 class="text-xs font-semibold text-white/90 truncate pr-1">{{ track.title }}</h3>
+            <p class="text-[10px] text-white/40 truncate mt-0.5">{{ track.artist }}</p>
+          </div>
+        </div>
+
+        <!-- Right action control buttons -->
+        <div class="flex items-center space-x-2 shrink-0">
+          <!-- Play Pause quick button -->
+          <button class="w-9 h-9 rounded-full bg-white text-black hover:bg-[#e5e5e0] flex items-center justify-center transition-all cursor-pointer shadow active:scale-95"
+                  (click)="audioService.togglePlay(); $event.stopPropagation()">
+            <mat-icon class="text-sm">
+              {{ audioService.isPlaying() ? 'pause' : 'play_arrow' }}
+            </mat-icon>
+          </button>
+
+          <!-- Skip Next -->
+          <button class="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 text-white/60 flex items-center justify-center transition-all cursor-pointer border border-white/10"
+                  (click)="audioService.next(); $event.stopPropagation()">
+            <mat-icon class="text-sm">skip_next</mat-icon>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  }
+
+  <!-- ================= IMMERSIVE FULL-SCREEN NOW PLAYING OVERLAY (Slide up phone music deck format) ================= -->
+  @if (showNowPlayingFull() && audioService.currentTrack(); as track) {
+    <!-- Full-Size Glass overlay sheet sliding from bottom -->
+    <div id="immersive-player-overlay"
+         class="fixed inset-0 bg-[#050505]/95 backdrop-blur-3xl z-50 flex flex-col justify-between p-6 overflow-y-auto animate-fade-in md:-z-10"
+         style="animation: slideUp 0.35s ease-out forwards;"
+         (click)="showNowPlayingFull.set(false)">
+      
+      <!-- Slide upward CSS transitions layout keys -->
+      <style>
+        @keyframes slideUp {
+          0% { transform: translateY(100%); }
+          100% { transform: translateY(0); }
+        }
+      </style>
+
+      <!-- Overlay Inner Content Block -->
+      <div class="w-full max-w-md mx-auto flex-grow flex flex-col justify-between py-6 h-full relative" (click)="$event.stopPropagation()">
+        
+        <!-- Header close row -->
+        <div class="flex items-center justify-between">
+          <button class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer"
+                  (click)="showNowPlayingFull.set(false)">
+            <mat-icon class="text-lg">keyboard_arrow_down</mat-icon>
+          </button>
+          <span class="text-[9px] font-mono uppercase tracking-widest text-white/30">Now Playing Deck</span>
+          <button class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/45 hover:text-rose-500 transition-all cursor-pointer font-sans"
+                  [ngStyle]="{'color': track.isFavorite ? '#ef4444' : ''}"
+                  (click)="toggleFavorite(track, $event)">
+            <mat-icon class="text-lg">{{ track.isFavorite ? 'favorite' : 'favorite_border' }}</mat-icon>
+          </button>
+        </div>
+
+        <!-- Center immersive record view -->
+        <div class="my-auto flex flex-col items-center py-6">
+          
+          <!-- Vinyl Album Artwork -->
+          <div class="w-64 h-64 md:w-72 md:h-72 rounded-full overflow-hidden bg-zinc-950 border-4 border-zinc-900 shadow-2xl relative shadow-black"
+               [ngClass]="audioService.isPlaying() ? 'animate-[spin_24s_linear_infinite]' : ''">
+            <img [src]="track.coverUrl" [alt]="track.title" referrerpolicy="no-referrer" class="w-full h-full object-cover" />
+            <!-- Centered real record pin design -->
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="w-16 h-16 bg-[#050505]/95 rounded-full border border-white/15 flex items-center justify-center">
+                <div class="w-5 h-5 bg-[#f5f5f4] rounded-full shadow"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Text details -->
+          <div class="text-center mt-8 w-full px-4 font-sans">
+            <h1 class="font-display italic text-2xl text-[#f5f5f4] truncate">{{ track.title }}</h1>
+            <p class="text-white/40 text-xs mt-1.5 truncate">{{ track.artist }} • {{ track.album }}</p>
+            <span class="inline-block mt-4 bg-white/5 text-white/50 border border-white/10 text-[9px] font-mono font-medium tracking-widest px-3 py-1 rounded-full uppercase">
+              {{ track.synthType ? 'Procedural Synths' : 'Physical File' }}
+            </span>
+          </div>
+
+        </div>
+
+        <!-- Timing controls and slider deck -->
+        <div class="space-y-6">
+          
+          <!-- Media Track Bar Progress seeker -->
+          <div class="space-y-2 font-sans">
+            <div class="w-full h-1 bg-white/10 rounded-full cursor-pointer relative"
+                 #overlayProgress
+                 (click)="onProgressBarClick($event, overlayProgress)">
+              <div class="absolute inset-y-0 left-0 bg-white rounded-full"
+                   [style.width.%]="(audioService.currentTime() / audioService.duration()) * 100"></div>
+            </div>
+            
+            <div class="flex justify-between items-center text-[10px] font-mono text-white/30">
+              <span>{{ formatTime(audioService.currentTime()) }}</span>
+              <span>{{ formatTime(audioService.duration()) }}</span>
+            </div>
+          </div>
+
+          <!-- Bottom Play Control Panel -->
+          <div class="p-4 bg-white/2 border border-white/5 rounded-3xl flex items-center justify-between" id="overlay-playback-controls font-sans">
+            <!-- Shuffle toggle button -->
+            <button class="p-2 rounded-xl transition-all cursor-pointer text-white/40 hover:text-white"
+                    [ngClass]="{'bg-white/15 !text-white border border-white/10': audioService.shuffleMode()}"
+                    (click)="audioService.toggleShuffle()">
+              <mat-icon class="text-lg">shuffle</mat-icon>
+            </button>
+
+            <!-- Previous track -->
+            <button class="p-2.5 rounded-xl text-white/60 hover:text-white hover:bg-white/5 active:scale-90 transition-all cursor-pointer"
+                    (click)="audioService.previous()">
+              <mat-icon class="text-2xl leading-none">skip_previous</mat-icon>
+            </button>
+
+            <!-- core circular toggle playing audio status -->
+            <button class="w-14 h-14 rounded-full bg-[#f5f5f4] hover:bg-[#e5e5e0] text-black flex items-center justify-center shadow-lg transform active:scale-95 transition-all cursor-pointer"
+                    (click)="audioService.togglePlay()">
+              <mat-icon class="text-3xl leading-none">
+                {{ audioService.isPlaying() ? 'pause' : 'play_arrow' }}
+              </mat-icon>
+            </button>
+
+            <!-- Next track -->
+            <button class="p-2.5 rounded-xl text-white/60 hover:text-white hover:bg-white/5 active:scale-90 transition-all cursor-pointer"
+                    (click)="audioService.next()">
+              <mat-icon class="text-2xl leading-none">skip_next</mat-icon>
+            </button>
+
+            <!-- Cycle Repeat options -->
+            <button class="p-2 rounded-xl transition-all cursor-pointer"
+                    [ngClass]="audioService.repeatMode() !== 'none' ? 'bg-white/15 !text-white border border-white/10' : 'text-white/40 hover:text-white'"
+                    (click)="audioService.cycleRepeat()">
+              <mat-icon class="text-lg">
+                {{ audioService.repeatMode() === 'one' ? 'repeat_one' : 'repeat' }}
+              </mat-icon>
+            </button>
+          </div>
+
+          <!-- Mini volume control indicator -->
+          <div class="flex items-center space-x-3 px-2 text-white/40 font-sans" id="overlay-volume-panel">
+            <mat-icon class="text-base select-none">volume_down</mat-icon>
+            <div class="flex-grow h-1 bg-white/10 rounded-full relative cursor-pointer"
+                 #overlayVol
+                 (click)="onVolumeBarClick($event, overlayVol)">
+              <div class="absolute inset-y-0 left-0 bg-white rounded-full"
+                   [style.width.%]="audioService.volume() * 100"></div>
+            </div>
+            <mat-icon class="text-base select-none">volume_up</mat-icon>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  }
+
+  <!-- Mobile Bottom Simple Navigation Rail: Visible only on smaller display touch screens -->
+  <nav id="mobile-navigation-bottom" class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#050505]/95 backdrop-blur-xl border-t border-white/10 flex items-center justify-around z-30 px-4">
+    <button class="flex flex-col items-center justify-center text-white/40 cursor-pointer w-12"
+            [ngClass]="{'text-white font-medium': activeTab() === 'home'}"
+            (click)="selectTab('home')">
+      <mat-icon class="text-xl">home</mat-icon>
+      <span class="text-[9px] mt-0.5 font-mono uppercase tracking-wider scale-90">Home</span>
+    </button>
+    
+    <button class="flex flex-col items-center justify-center text-white/40 cursor-pointer w-12"
+            [ngClass]="{'text-white font-medium': activeTab() === 'library'}"
+            (click)="selectTab('library')">
+      <mat-icon class="text-xl">subscriptions</mat-icon>
+      <span class="text-[9px] mt-0.5 font-mono uppercase tracking-wider scale-90">Library</span>
+    </button>
+
+    <button class="flex flex-col items-center justify-center text-white/40 cursor-pointer w-12 relative font-sans"
+            [ngClass]="{'text-white font-medium': activeTab() === 'queue'}"
+            (click)="selectTab('queue')">
+      <mat-icon class="text-xl">playlist_play</mat-icon>
+      <span class="text-[9px] mt-0.5 font-mono uppercase tracking-wider scale-90">Queue</span>
+      @if (audioService.queue().length > 0) {
+        <span class="absolute top-0 right-1 w-4 h-4 bg-white/10 text-white border border-white/15 rounded-full flex items-center justify-center text-[9px] font-bold font-mono">
+          {{ audioService.queue().length }}
+        </span>
+      }
+    </button>
+  </nav>
+
+</div>

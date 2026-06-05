@@ -1,0 +1,6 @@
+{
+  "name": "Tempo",
+  "description": "A sleek, modern, high-fidelity dark-themed mobile music player with real-time audio synthesis, playlist management, and a dynamic glassmorphic Now Playing controller.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
